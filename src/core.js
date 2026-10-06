@@ -8,7 +8,9 @@ const RULES = [
     /\/(u\/\d+\/)?d\/(e\/)?[\w-]{10,}|\/folders\/[\w-]{10,}/.test(u.pathname) ||
     /^[\w-]{10,}$/.test(u.searchParams.get('id') || '')],
   [['drive.usercontent.google.com'], u => /^[\w-]{10,}$/.test(u.searchParams.get('id') || '')],
-  [['magicode.me'], u => /\/send-file\/file\/[^/]+/.test(u.pathname)],
+  // מג'יקוד: קישור צפייה (/send-file/file/<id>/view) וגם קישור הורדה (כל קישור עם download)
+  [['magicode.me'], u => /\/send-file\/file\/[^/]+/.test(u.pathname) ||
+    (/download/i.test(u.pathname + u.search) && !/^\/send-file\/(prep-)?upload\/?$/.test(u.pathname))],
   [['jumbomail.me', 'jmbo.me'], hasToken],
 ];
 

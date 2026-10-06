@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         קיצור קישורים אוטומטי בפורומי NodeBB
 // @namespace    https://github.com/tsoolgee/nodebb-link-shortener
-// @version      0.0.1
+// @version      0.0.2
 // @description  מדביקים קישור של גוגל דרייב / ג'מבו מייל / מג'יקוד בעורך של פורום NodeBB – והוא מוחלף בשקט בקישור did.li מקוצר
 // @author       tsoolgee
 // @homepageURL  https://github.com/tsoolgee/nodebb-link-shortener
@@ -48,7 +48,9 @@
       /\/(u\/\d+\/)?d\/(e\/)?[\w-]{10,}|\/folders\/[\w-]{10,}/.test(u.pathname) ||
       /^[\w-]{10,}$/.test(u.searchParams.get('id') || '')],
     [['drive.usercontent.google.com'], u => /^[\w-]{10,}$/.test(u.searchParams.get('id') || '')],
-    [['magicode.me'], u => /\/send-file\/file\/[^/]+/.test(u.pathname)],
+    // מג'יקוד: קישור צפייה (/send-file/file/<id>/view) וגם קישור הורדה (כל קישור עם download)
+    [['magicode.me'], u => /\/send-file\/file\/[^/]+/.test(u.pathname) ||
+      (/download/i.test(u.pathname + u.search) && !/^\/send-file\/(prep-)?upload\/?$/.test(u.pathname))],
     [['jumbomail.me', 'jmbo.me'], hasToken],
   ];
 
