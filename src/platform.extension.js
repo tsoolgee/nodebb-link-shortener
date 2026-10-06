@@ -7,3 +7,17 @@ function requestShort(url) {
     });
   });
 }
+
+function loadSettings() {
+  return new Promise(resolve => chrome.storage.sync.get('settings', r => resolve(r && r.settings)));
+}
+
+function saveSettings(s) {
+  return new Promise(resolve => chrome.storage.sync.set({ settings: s }, resolve));
+}
+
+function onSettingsChanged(cb) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'sync' && changes.settings) cb(changes.settings.newValue);
+  });
+}

@@ -27,12 +27,25 @@ function isNodeBB() {
   return nodebb;
 }
 
+let settings = withDefaults();
+loadSettings().then(s => { settings = withDefaults(s); });
+onSettingsChanged(s => { settings = withDefaults(s); });
+
+// האם לפעול בדף הזה: חריגים קודמים לכול, אחריהם רשימת האתרים, ואז הזיהוי האוטומטי
+function isActiveHere() {
+  const host = location.hostname;
+  if (hostInList(host, settings.excluded)) return false;
+  if (hostInList(host, settings.sites)) return true;
+  return settings.autoDetect && isNodeBB();
+}
+
 function shouldShorten(url) {
   let u;
   try { u = new URL(url); } catch (e) { return false; }
   const host = u.hostname.toLowerCase();
-  return RULES.some(([domains, test]) =>
-    domains.some(d => host === d || host.endsWith('.' + d)) && test(u));
+  if (RULES.some(([domains, test]) => hostInList(host, domains) && test(u))) return true;
+  // דומיין שהמשתמש הוסיף: כל קישור חוץ מדף הבית
+  return hostInList(host, settings.domains) && (u.pathname.replace(/\/+$/, '') !== '' || u.search !== '');
 }
 
 function shorten(url) {
@@ -65,7 +78,7 @@ function replaceInField(el, original, short) {
 
 function onPaste(e) {
   const el = e.target;
-  if (!(el instanceof HTMLTextAreaElement) || !isNodeBB()) return;
+  if (!(el instanceof HTMLTextAreaElement) || !isActiveHere()) return;
   const text = e.clipboardData && e.clipboardData.getData('text/plain');
   if (!text) return;
   const urls = [...new Set((text.match(URL_RE) || []).map(u => u.replace(/[.,;:!?]+$/, '')))]

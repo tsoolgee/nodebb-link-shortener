@@ -7,7 +7,7 @@ import shutil
 import zipfile
 from pathlib import Path
 
-VERSION = "0.0.2"
+VERSION = "0.0.3"
 NAME = "nodebb-link-shortener"
 REPO = "tsoolgee/nodebb-link-shortener"
 TITLE = "קיצור קישורים אוטומטי בפורומי NodeBB"
@@ -42,6 +42,10 @@ def build_userscript():
 // @downloadURL  {RAW}
 // @match        *://*/*
 // @grant        GM_xmlhttpRequest
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_addValueChangeListener
+// @grant        GM_registerMenuCommand
 // @connect      {API_HOST}
 // @run-at       document-idle
 // ==/UserScript==
@@ -49,7 +53,7 @@ def build_userscript():
 """
     out = ROOT / "userscript" / f"{NAME}.user.js"
     out.parent.mkdir(exist_ok=True)
-    out.write_text(header + wrap(read("platform.userscript.js"), read("core.js")), encoding="utf-8")
+    out.write_text(header + wrap(read("settings.js"), read("settings-ui.js"), read("platform.userscript.js"), read("core.js")), encoding="utf-8")
     return out
 
 
@@ -79,7 +83,10 @@ def build_extension():
         "description": DESC,
         "icons": {str(s): f"icon{s}.png" for s in (16, 48, 128)},
         "background": {"service_worker": "background.js"},
+        "permissions": ["storage"],
         "host_permissions": [f"https://{API_HOST}/*"],
+        "action": {"default_title": TITLE, "default_popup": "options.html"},
+        "options_ui": {"page": "options.html", "open_in_tab": False},
         "content_scripts": [{
             "matches": ["<all_urls>"],
             "js": ["content.js"],
@@ -89,7 +96,15 @@ def build_extension():
     }
     (ext / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     (ext / "background.js").write_text(read("background.js"), encoding="utf-8")
-    (ext / "content.js").write_text(wrap(read("platform.extension.js"), read("core.js")), encoding="utf-8")
+    (ext / "content.js").write_text(wrap(read("settings.js"), read("platform.extension.js"), read("core.js")), encoding="utf-8")
+    (ext / "options.js").write_text(
+        wrap(read("settings.js"), read("platform.extension.js"), read("settings-ui.js"), "renderSettings(document.body);"),
+        encoding="utf-8")
+    (ext / "options.html").write_text(
+        '<!doctype html>\n<html lang="he" dir="rtl"><head><meta charset="utf-8"><title>הגדרות</title>'
+        '<style>body{margin:0;min-width:400px}@media (prefers-color-scheme:dark){body{background:#1f2329}}</style>'
+        '</head><body><script src="options.js"></script></body></html>\n',
+        encoding="utf-8")
     build_icons(ext)
 
     dist = ROOT / "dist"

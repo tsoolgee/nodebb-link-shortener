@@ -1,6 +1,38 @@
 (function () {
   'use strict';
 
+  // הגדרות משותפות: ברירות מחדל ועזרים לרשימות אתרים.
+  // הפלטפורמה מספקת loadSettings() → Promise, saveSettings(s) → Promise, onSettingsChanged(cb).
+
+  const DEFAULT_SETTINGS = {
+    autoDetect: true, // זיהוי אוטומטי של פורומי NodeBB
+    sites: [],        // אתרים שבהם לפעול תמיד, גם בלי זיהוי
+    excluded: [],     // אתרים שבהם לא לפעול אף פעם
+    domains: [],      // דומיינים נוספים שקישורים אליהם יקוצרו
+  };
+
+  function withDefaults(s) {
+    return Object.assign({}, DEFAULT_SETTINGS, s || {});
+  }
+
+  // "https://www.Example.com/path" → "example.com"
+  function normalizeHost(s) {
+    s = String(s || '').trim().toLowerCase();
+    if (!s) return '';
+    try { s = new URL(/^[a-z]+:\/\//.test(s) ? s : 'http://' + s).hostname; } catch (e) { return ''; }
+    return s.replace(/^www\./, '');
+  }
+
+  function parseHostList(text) {
+    return [...new Set(String(text).split(/[\s,]+/).map(normalizeHost).filter(Boolean))];
+  }
+
+  // דומיין ברשימה תופס גם את תתי-הדומיינים שלו
+  function hostInList(host, list) {
+    host = host.toLowerCase().replace(/^www\./, '');
+    return list.some(d => host === d || host.endsWith('.' + d));
+  }
+
   // הבקשה נשלחת מה-background, שם מדיניות האבטחה של הפורום לא חלה
   function requestShort(url) {
     return new Promise((resolve, reject) => {
@@ -8,6 +40,20 @@
         if (chrome.runtime.lastError || !res || !res.ok) return reject(new Error('failed'));
         resolve(res.data);
       });
+    });
+  }
+
+  function loadSettings() {
+    return new Promise(resolve => chrome.storage.sync.get('settings', r => resolve(r && r.settings)));
+  }
+
+  function saveSettings(s) {
+    return new Promise(resolve => chrome.storage.sync.set({ settings: s }, resolve));
+  }
+
+  function onSettingsChanged(cb) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'sync' && changes.settings) cb(changes.settings.newValue);
     });
   }
 
@@ -40,12 +86,25 @@
     return nodebb;
   }
 
+  let settings = withDefaults();
+  loadSettings().then(s => { settings = withDefaults(s); });
+  onSettingsChanged(s => { settings = withDefaults(s); });
+
+  // האם לפעול בדף הזה: חריגים קודמים לכול, אחריהם רשימת האתרים, ואז הזיהוי האוטומטי
+  function isActiveHere() {
+    const host = location.hostname;
+    if (hostInList(host, settings.excluded)) return false;
+    if (hostInList(host, settings.sites)) return true;
+    return settings.autoDetect && isNodeBB();
+  }
+
   function shouldShorten(url) {
     let u;
     try { u = new URL(url); } catch (e) { return false; }
     const host = u.hostname.toLowerCase();
-    return RULES.some(([domains, test]) =>
-      domains.some(d => host === d || host.endsWith('.' + d)) && test(u));
+    if (RULES.some(([domains, test]) => hostInList(host, domains) && test(u))) return true;
+    // דומיין שהמשתמש הוסיף: כל קישור חוץ מדף הבית
+    return hostInList(host, settings.domains) && (u.pathname.replace(/\/+$/, '') !== '' || u.search !== '');
   }
 
   function shorten(url) {
@@ -78,7 +137,7 @@
 
   function onPaste(e) {
     const el = e.target;
-    if (!(el instanceof HTMLTextAreaElement) || !isNodeBB()) return;
+    if (!(el instanceof HTMLTextAreaElement) || !isActiveHere()) return;
     const text = e.clipboardData && e.clipboardData.getData('text/plain');
     if (!text) return;
     const urls = [...new Set((text.match(URL_RE) || []).map(u => u.replace(/[.,;:!?]+$/, '')))]

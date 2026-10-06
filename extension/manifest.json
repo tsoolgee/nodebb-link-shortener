@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "קיצור קישורים אוטומטי בפורומי NodeBB",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "מדביקים קישור של גוגל דרייב / ג'מבו מייל / מג'יקוד בעורך של פורום NodeBB – והוא מוחלף בשקט בקישור did.li מקוצר",
   "icons": {
     "16": "icon16.png",
@@ -11,9 +11,20 @@
   "background": {
     "service_worker": "background.js"
   },
+  "permissions": [
+    "storage"
+  ],
   "host_permissions": [
     "https://6ejpppqpkh.execute-api.eu-west-1.amazonaws.com/*"
   ],
+  "action": {
+    "default_title": "קיצור קישורים אוטומטי בפורומי NodeBB",
+    "default_popup": "options.html"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  },
   "content_scripts": [
     {
       "matches": [
